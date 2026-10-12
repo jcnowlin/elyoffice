@@ -81,47 +81,64 @@ jobs:
     needs: engines
     runs-on: windows-11-arm
     timeout-minutes: 180
-    if: contains(inputs.apps, matrix.app)
     strategy:
       fail-fast: false
       matrix:
         app: [ely-doc, ely-table, ely-show, ely-pdf, ely-tree, ely-mark]
     steps:
+      - name: Check selection
+        id: sel
+        shell: bash
+        run: |
+          if [[ " ${{ inputs.apps }} " == *" ${{ matrix.app }} "* ]]; then
+            echo "wanted=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "wanted=false" >>"$GITHUB_OUTPUT"
+            echo "${{ matrix.app }} not in '${{ inputs.apps }}', skipping"
+          fi
       - uses: actions/checkout@v4
+        if: steps.sel.outputs.wanted == 'true'
       - name: Restore LibreOffice engine
+        if: steps.sel.outputs.wanted == 'true'
         uses: actions/cache@v4
         with:
           path: engines/lo-win-arm64
           key: ely-lo-win-arm64-${{ inputs.lo_version }}
           restore-keys: ely-lo-win-arm64-
       - name: Restore MuPDF engine
+        if: steps.sel.outputs.wanted == 'true'
         uses: actions/cache@v4
         with:
           path: engines/mupdf-build
           key: ely-mupdf-win-arm64-8ad45e92f0935d3d87f1db3f873086472a5e1b24
           restore-keys: ely-mupdf-win-arm64-
       - name: Restore MinGit engine
+        if: steps.sel.outputs.wanted == 'true'
         uses: actions/cache@v4
         with:
           path: engines/git
           key: ely-mingit-arm64-2.56.0
           restore-keys: ely-mingit-arm64-
       - name: Restore tessdata engine
+        if: steps.sel.outputs.wanted == 'true'
         uses: actions/cache@v4
         with:
           path: engines/tessdata
           key: ely-tessdata-2026-10
           restore-keys: ely-tessdata-
       - name: Rust toolchain
+        if: steps.sel.outputs.wanted == 'true'
         shell: bash
         run: |
           rustup set profile minimal
           rustup update --no-self-update stable
           rustup target add aarch64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
+        if: steps.sel.outputs.wanted == 'true'
         with:
           key: win-arm64-${{ matrix.app }}
       - name: Stage and package ${{ matrix.app }}
+        if: steps.sel.outputs.wanted == 'true'
         shell: bash
         env:
           ELY_LO_DIR: ${{ github.workspace }}/engines/lo-win-arm64
@@ -133,6 +150,7 @@ jobs:
           ./packaging/windows/installer.sh "${{ matrix.app }}"
           ls dist/
       - name: Upload installer
+        if: steps.sel.outputs.wanted == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.app }}-windows-arm64
