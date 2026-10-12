@@ -10,8 +10,16 @@ jobs=$(sysctl -n hw.ncpu 2>/dev/null || nproc)
 # Windows: Git for Windows' MinGit at the same version, checked.
 case $(uname -s) in
   MINGW* | MSYS*)
-    asset=MinGit-2.56.0-64-bit.zip
-    sum=064b440ff870ed5198527e8f3a92cdf5bd2fd0fedf5e718af95e3fdaddeff718
+    case ${ELY_ARCH:-x86_64} in
+      aarch64)
+        asset=MinGit-2.56.0-arm64.zip
+        sum=cb3b0f2d486ea52673227151a5baf5bc13861ff80e74e94e46d614d1bfcd5c06
+        ;;
+      *)
+        asset=MinGit-2.56.0-64-bit.zip
+        sum=064b440ff870ed5198527e8f3a92cdf5bd2fd0fedf5e718af95e3fdaddeff718
+        ;;
+    esac
     work=$(mktemp -d)
     trap 'rm -rf "$work"' EXIT
     curl -fsSL -o "$work/$asset" "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.1/$asset"

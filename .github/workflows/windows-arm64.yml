@@ -1,0 +1,140 @@
+# Windows ARM64 (aarch64-pc-windows-msvc) build, pieced up so no single
+# runner sits on the whole pipeline: engines build in parallel matrix legs
+# with per-engine caches, then each app builds+packages in its own job.
+# Manual trigger only until the first green run; ely-mark stays opt-in
+# until CEF's ARM64 story is proven.
+name: windows-arm64
+on:
+  workflow_dispatch:
+    inputs:
+      apps:
+        description: "Space-separated app slugs to build and package"
+        default: "ely-doc ely-table ely-show ely-pdf ely-tree"
+        required: true
+      lo_version:
+        description: "LibreOffice version to extract for ely-lok"
+        default: "26.8.0"
+        required: true
+
+env:
+  ELY_ARCH: aarch64
+  CARGO_BUILD_TARGET: aarch64-pc-windows-msvc
+
+jobs:
+  engines:
+    name: engine ${{ matrix.engine }}
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: lo
+            path: engines/lo-win-arm64
+            key: ely-lo-win-arm64-${{ inputs.lo_version }}
+          - engine: mupdf
+            path: engines/mupdf-build
+            key: ely-mupdf-win-arm64-8ad45e92f0935d3d87f1db3f873086472a5e1b24
+          - engine: git
+            path: engines/git
+            key: ely-mingit-arm64-2.56.0
+          - engine: tessdata
+            path: engines/tessdata
+            key: ely-tessdata-2026-10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore ${{ matrix.engine }} cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.path }}
+          key: ${{ matrix.key }}
+      - name: Build ${{ matrix.engine }}
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          ELY_LO_VERSION: ${{ inputs.lo_version }}
+        run: |
+          set -euo pipefail
+          case "${{ matrix.engine }}" in
+            lo)
+              ./scripts/extract-official-lo-win-arm64.sh
+              ;;
+            mupdf)
+              # vcpkg first: build-mupdf.sh links OpenSSL statically.
+              [ -d engines/vcpkg ] || git clone --depth 1 https://github.com/microsoft/vcpkg.git engines/vcpkg
+              ./engines/vcpkg/bootstrap-vcpkg.sh
+              ./engines/vcpkg/vcpkg install "openssl:arm64-windows-static"
+              ./scripts/fetch-references.sh
+              ./scripts/build-mupdf.sh
+              ;;
+            git)
+              ./scripts/build-git.sh
+              ;;
+            tessdata)
+              ./scripts/fetch-tessdata.sh
+              ;;
+          esac
+
+  build:
+    name: ${{ matrix.app }}
+    needs: engines
+    runs-on: windows-11-arm
+    timeout-minutes: 180
+    if: contains(inputs.apps, matrix.app)
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [ely-doc, ely-table, ely-show, ely-pdf, ely-tree, ely-mark]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore LibreOffice engine
+        uses: actions/cache@v4
+        with:
+          path: engines/lo-win-arm64
+          key: ely-lo-win-arm64-${{ inputs.lo_version }}
+          restore-keys: ely-lo-win-arm64-
+      - name: Restore MuPDF engine
+        uses: actions/cache@v4
+        with:
+          path: engines/mupdf-build
+          key: ely-mupdf-win-arm64-8ad45e92f0935d3d87f1db3f873086472a5e1b24
+          restore-keys: ely-mupdf-win-arm64-
+      - name: Restore MinGit engine
+        uses: actions/cache@v4
+        with:
+          path: engines/git
+          key: ely-mingit-arm64-2.56.0
+          restore-keys: ely-mingit-arm64-
+      - name: Restore tessdata engine
+        uses: actions/cache@v4
+        with:
+          path: engines/tessdata
+          key: ely-tessdata-2026-10
+          restore-keys: ely-tessdata-
+      - name: Rust toolchain
+        shell: bash
+        run: |
+          rustup set profile minimal
+          rustup update --no-self-update stable
+          rustup target add aarch64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: win-arm64-${{ matrix.app }}
+      - name: Stage and package ${{ matrix.app }}
+        shell: bash
+        env:
+          ELY_LO_DIR: ${{ github.workspace }}/engines/lo-win-arm64
+          ELY_DIST: ${{ github.workspace }}/dist
+        run: |
+          set -euo pipefail
+          stage=$(mktemp -d)
+          ./packaging/stage.sh "${{ matrix.app }}" "$stage"
+          ./packaging/windows/installer.sh "${{ matrix.app }}"
+          ls dist/
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-windows-arm64
+          path: dist/*-windows-aarch64-setup.exe
+          if-no-files-found: error

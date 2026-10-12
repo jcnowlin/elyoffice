@@ -48,8 +48,13 @@ if uses ely-lok; then
   done < <(find "$out/libreoffice/program" -type f -size -64c)
   if [ -n "$exe" ]; then
     # The kernel needs the VC++ runtime; it ships beside it.
-    crt=$(ls -d "/c/Program Files/Microsoft Visual Studio/2022/"*/VC/Redist/MSVC/*/x64/Microsoft.VC143.CRT | tail -n 1)
-    need "$crt" "the Visual Studio 2022 C++ tools"
+    # ELY_ARCH: x86_64 (default) or aarch64 — selects the CRT folder.
+    case ${ELY_ARCH:-x86_64} in
+      aarch64) vcarch=arm64 ;;
+      *) vcarch=x64 ;;
+    esac
+    crt=$(ls -d "/c/Program Files/Microsoft Visual Studio/2022/"*/VC/Redist/MSVC/*/"$vcarch"/Microsoft.VC143.CRT | tail -n 1)
+    need "$crt" "the Visual Studio 2022 C++ tools ($vcarch)"
     cp "$crt"/*.dll "$out/libreoffice/program/"
   fi
 fi
