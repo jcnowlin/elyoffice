@@ -2,18 +2,28 @@
 # OCR language data, tessdata_fast at one commit, into engines/tessdata.
 set -euo pipefail
 
+# shasum (perl) ships on macOS but not in Git Bash; sha256sum (coreutils)
+# is the reverse. Prefer whichever exists.
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d' ' -f1
+  else
+    shasum -a 256 "$1" | cut -d' ' -f1
+  fi
+}
+
 out="$(cd "$(dirname "$0")/.." && pwd)/engines/tessdata"
 rev=87416418657359cb625c412a48b6e1d6d41c29bd
 mkdir -p "$out"
 while read -r lang sum; do
   file="$out/$lang.traineddata"
   [ "$lang" = LICENSE ] && file=$out/LICENSE
-  if [ -f "$file" ] && [ "$(shasum -a 256 "$file" | cut -d' ' -f1)" = "$sum" ]; then
+  if [ -f "$file" ] && [ "$(sha256_of "$file")" = "$sum" ]; then
     echo "ok    $lang"
     continue
   fi
   curl -fsSL -o "$file.part" "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/$rev/${file##*/}"
-  got=$(shasum -a 256 "$file.part" | cut -d' ' -f1)
+  got=$(sha256_of "$file.part")
   if [ "$got" != "$sum" ]; then
     rm -f "$file.part"
     echo "fetch-tessdata: $lang hash $got, want $sum" >&2

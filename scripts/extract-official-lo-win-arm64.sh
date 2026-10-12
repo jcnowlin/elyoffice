@@ -16,21 +16,27 @@ if [ "$(cat "$out/.version" 2>/dev/null)" = "$lo_version" ] && [ -d "$out/progra
   exit 0
 fi
 
-command -v 7z >/dev/null || {
-  echo "extract-official-lo-win-arm64: needs 7z (choco install 7zip)" >&2
-  exit 1
-}
-
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 echo "extract-official-lo-win-arm64: downloading $msi"
 curl -fsSL --retry 3 -o "$work/$msi" "$url"
 
-# The MSI's files land under a LibreOffice program folder; normalize the
-# layout to what stage.sh expects: program/, share/, presets/ at top.
-echo "extract-official-lo-win-arm64: extracting"
-7z x -y -o"$work/x" "$work/$msi" >/dev/null
-base=$(find "$work/x" -maxdepth 3 -type d -name program | head -n 1)
+# Administrative install: unpacks the MSI file tree without installing
+# anything. (7z only sees the MSI's internal streams, not the payload.)
+case $(uname -s) in
+  MINGW* | MSYS*) ;;
+  *)
+    echo "extract-official-lo-win-arm64: Windows only (needs msiexec)" >&2
+    exit 1
+    ;;
+esac
+echo "extract-official-lo-win-arm64: extracting (msiexec /a)"
+mkdir -p "$work/x"
+msiexec /a "$(cygpath -w "$work/$msi")" /qn "TARGETDIR=$(cygpath -w "$work/x")"
+
+# Normalize the layout to what stage.sh expects: program/, share/,
+# presets/ at top.
+base=$(find "$work/x" -maxdepth 4 -type d -name program | head -n 1)
 [ -n "$base" ] || {
   echo "extract-official-lo-win-arm64: no program/ in $msi" >&2
   exit 1

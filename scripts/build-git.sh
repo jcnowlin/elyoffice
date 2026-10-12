@@ -2,6 +2,16 @@
 # Builds the pinned Git, relocatable, into engines/git.
 set -euo pipefail
 
+# shasum (perl) ships on macOS but not in Git Bash; sha256sum (coreutils)
+# is the reverse. Prefer whichever exists.
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d' ' -f1
+  else
+    shasum -a 256 "$1" | cut -d' ' -f1
+  fi
+}
+
 root=$(cd "$(dirname "$0")/.." && pwd)
 src=$root/engines/git-src
 out=$root/engines/git
@@ -23,7 +33,7 @@ case $(uname -s) in
     work=$(mktemp -d)
     trap 'rm -rf "$work"' EXIT
     curl -fsSL -o "$work/$asset" "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.1/$asset"
-    got=$(shasum -a 256 "$work/$asset" | cut -d' ' -f1)
+    got=$(sha256_of "$work/$asset")
     [ "$got" = "$sum" ] || {
       echo "build-git.sh: $asset hash $got, want $sum" >&2
       exit 1

@@ -12,7 +12,9 @@ mkdir -p "$src"
 case $(uname -s) in
   MINGW* | MSYS*)
     rm -rf "$src" && mkdir -p "$src"
-    tar -C "$root/reference/mupdf" --exclude .git -cf - . | tar -C "$src" -xf -
+    # Dereference: Windows runners can't recreate symlinks, so the copy
+    # materializes them as real files (the MSVC build only needs contents).
+    tar -C "$root/reference/mupdf" --dereference --exclude .git -cf - . | tar -C "$src" -xf -
     ;;
   *) rsync -a --delete --exclude .git "$root/reference/mupdf/" "$src/" ;;
 esac

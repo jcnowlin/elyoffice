@@ -2,6 +2,16 @@
 # git-lfs at one release, checked, beside Git's own commands.
 set -euo pipefail
 
+# shasum (perl) ships on macOS but not in Git Bash; sha256sum (coreutils)
+# is the reverse. Prefer whichever exists.
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d' ' -f1
+  else
+    shasum -a 256 "$1" | cut -d' ' -f1
+  fi
+}
+
 root=$(cd "$(dirname "$0")/.." && pwd)
 exec_dir=$root/engines/git/libexec/git-core
 git=$root/engines/git/bin/git
@@ -22,7 +32,7 @@ esac
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 curl -fsSL -o "$work/$asset" "https://github.com/git-lfs/git-lfs/releases/download/$version/$asset"
-got=$(shasum -a 256 "$work/$asset" | cut -d' ' -f1)
+got=$(sha256_of "$work/$asset")
 if [ "$got" != "$sum" ]; then
   echo "fetch-git-lfs: $asset hash $got, want $sum" >&2
   exit 1
@@ -34,7 +44,7 @@ esac
 install -m 755 "$(find "$work/x" -type f -name "git-lfs$exe" | head -1)" "$exec_dir/git-lfs$exe"
 # The archive has no licence; the tag's own, checked.
 curl -fsSL -o "$work/LICENSE.md" "https://raw.githubusercontent.com/git-lfs/git-lfs/$version/LICENSE.md"
-got=$(shasum -a 256 "$work/LICENSE.md" | cut -d' ' -f1)
+got=$(sha256_of "$work/LICENSE.md")
 [ "$got" = 4fae9062ab5cdd5fb15486b728534d8aded8b4ae9d84b6d66a956f5162c366b6 ] || {
   echo "fetch-git-lfs: LICENSE.md hash $got" >&2
   exit 1
