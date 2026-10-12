@@ -39,6 +39,9 @@ case $(uname -s) in
       exit 1
     }
     rm -rf "$out"
+    # unzip -d cannot create missing parents (engines/ is gitignored, so a
+    # fresh runner has no engines/ dir yet).
+    mkdir -p "$out"
     unzip -q "$work/$asset" -d "$out"
     "$out/cmd/git.exe" --version
     exit 0

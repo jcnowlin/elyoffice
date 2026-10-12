@@ -21,18 +21,44 @@ trap 'rm -rf "$work"' EXIT
 echo "extract-official-lo-win-arm64: downloading $msi"
 curl -fsSL --retry 3 -o "$work/$msi" "$url"
 
+# Portable SHA-256 (Git Bash has sha256sum via coreutils).
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d' ' -f1
+  else
+    shasum -a 256 "$1" | cut -d' ' -f1
+  fi
+}
+
 # Administrative install: unpacks the MSI file tree without installing
 # anything. (7z only sees the MSI's internal streams, not the payload.)
 case $(uname -s) in
   MINGW* | MSYS*) ;;
   *)
-    echo "extract-official-lo-win-arm64: Windows only (needs msiexec)" >&2
+    echo "extract-official-lo-win-arm64: Windows only (needs lessmsi)" >&2
     exit 1
     ;;
 esac
-echo "extract-official-lo-win-arm64: extracting (msiexec /a)"
+# Extract with lessmsi (https://github.com/activescott/lessmsi): it reads the
+# MSI file tables directly and is fully headless. msiexec /a hangs on the
+# LibreOffice MSI under GitHub's Windows runners even with /qn (observed:
+# 2h timeout with the msiexec process still alive).
+lessmsi_ver=1.10.0
+lessmsi_zip="$work/lessmsi-v${lessmsi_ver}.zip"
+lessmsi_sha256="fdf6a3aab9c893966057004b64e2931af431a3459d323666e2e75c33a6825816"
+echo "extract-official-lo-win-arm64: downloading lessmsi v${lessmsi_ver}"
+curl -fsSL --retry 3 -o "$lessmsi_zip" \
+  "https://github.com/activescott/lessmsi/releases/download/v${lessmsi_ver}/lessmsi-v${lessmsi_ver}.zip"
+got=$(sha256_of "$lessmsi_zip")
+[ "$got" = "$lessmsi_sha256" ] || {
+  echo "extract-official-lo-win-arm64: lessmsi hash mismatch (got $got)" >&2
+  exit 1
+}
+mkdir -p "$work/lessmsi"
+unzip -q "$lessmsi_zip" -d "$work/lessmsi"
+echo "extract-official-lo-win-arm64: extracting (lessmsi x)"
 mkdir -p "$work/x"
-msiexec /a "$(cygpath -w "$work/$msi")" /qn "TARGETDIR=$(cygpath -w "$work/x")"
+"$work/lessmsi/lessmsi.exe" x "$(cygpath -w "$work/$msi")" "$(cygpath -w "$work/x")\\"
 
 # Normalize the layout to what stage.sh expects: program/, share/,
 # presets/ at top.

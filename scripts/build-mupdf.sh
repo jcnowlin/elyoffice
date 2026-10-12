@@ -14,7 +14,12 @@ case $(uname -s) in
     rm -rf "$src" && mkdir -p "$src"
     # Dereference: Windows runners can't recreate symlinks, so the copy
     # materializes them as real files (the MSVC build only needs contents).
-    tar -C "$root/reference/mupdf" --dereference --exclude .git -cf - . | tar -C "$src" -xf -
+    # Exclude zxing-cpp's libzint symlinks: upstream leaves them dangling
+    # (they point at a zint/ dir that doesn't exist inside zxing-cpp), and
+    # --dereference chokes on them. Nothing references them: libzxing.vcxproj
+    # compiles zero libzint files, and libmupdf (the only target we build)
+    # doesn't link libzxing at all.
+    tar -C "$root/reference/mupdf" --dereference --exclude .git --exclude '*/libzint' -cf - . | tar -C "$src" -xf -
     ;;
   *) rsync -a --delete --exclude .git "$root/reference/mupdf/" "$src/" ;;
 esac
