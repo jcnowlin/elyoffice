@@ -25,7 +25,9 @@ need() { # path, what to run
   }
 }
 build() { cargo build --manifest-path "$root/Cargo.toml" --release "$@"; }
-release=${CARGO_TARGET_DIR:-$root/target}/release
+# CARGO_BUILD_TARGET (e.g. aarch64-pc-windows-msvc) nests the release dir
+# one level deeper: target/<target>/release instead of target/release.
+release=${CARGO_TARGET_DIR:-$root/target}/${CARGO_BUILD_TARGET:+$CARGO_BUILD_TARGET/}release
 
 rm -rf "$out"
 mkdir -p "$out"
