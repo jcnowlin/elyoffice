@@ -99,5 +99,5 @@ if [ "$slug" = ely-tree ] || { [ "$slug" = ely-mark ] && [ "$(uname)" != Darwin 
     *) put Git "$root/engines/git-src/COPYING" "$root/engines/git-src/LGPL-2.1" ;;
   esac
   lfs_lic="$root/engines/git/share/doc/git-lfs/LICENSE.md"
-  [ -s "$lfs_lic" ] && put git-lfs "$lfs_lic"
+  if [ -s "$lfs_lic" ]; then put git-lfs "$lfs_lic"; fi
 fi

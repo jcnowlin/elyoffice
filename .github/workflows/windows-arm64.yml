@@ -39,6 +39,7 @@ jobs:
               engines/mupdf-src/COPYING
               engines/mupdf-src/thirdparty
               engines/mupdf-src/resources/fonts
+              'engines/mupdf-src/platform/win32/*.vcxproj'
               engines/vcpkg/installed/arm64-windows-static
               reference/mupdf/include
             key: ely-mupdf-win-arm64-8ad45e92
@@ -55,9 +56,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ matrix.path }}
-          # hashFiles isn't allowed in the matrix definition, so the mupdf
-          # key gets its script hash here (must match the build job's key).
-          key: ${{ matrix.engine == 'mupdf' && format('{0}-{1}', matrix.key, hashFiles('scripts/build-mupdf.sh', 'patches/mupdf/**')) || matrix.key }}
+          # hashFiles isn't allowed in the matrix definition, so script
+          # hashes get appended here (must match the build job's keys).
+          key: ${{ matrix.engine == 'mupdf' && format('{0}-{1}', matrix.key, hashFiles('scripts/build-mupdf.sh', 'patches/mupdf/**')) || matrix.engine == 'lo' && format('{0}-{1}', matrix.key, hashFiles('scripts/extract-official-lo-win-arm64.sh')) || matrix.key }}
       - name: Build ${{ matrix.engine }}
         if: steps.cache.outputs.cache-hit != 'true'
         shell: bash
@@ -100,7 +101,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: engines/lo-win-arm64
-          key: ely-lo-win-arm64-${{ inputs.lo_version }}
+          key: ely-lo-win-arm64-${{ inputs.lo_version }}-${{ hashFiles('scripts/extract-official-lo-win-arm64.sh') }}
           fail-on-cache-miss: true
       - name: Restore MuPDF engine
         uses: actions/cache/restore@v4
@@ -110,6 +111,7 @@ jobs:
             engines/mupdf-src/COPYING
             engines/mupdf-src/thirdparty
             engines/mupdf-src/resources/fonts
+            'engines/mupdf-src/platform/win32/*.vcxproj'
             engines/vcpkg/installed/arm64-windows-static
             reference/mupdf/include
           key: ely-mupdf-win-arm64-8ad45e92-${{ hashFiles('scripts/build-mupdf.sh', 'patches/mupdf/**') }}

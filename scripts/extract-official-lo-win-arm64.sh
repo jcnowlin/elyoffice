@@ -75,9 +75,16 @@ for part in program share presets; do
   [ -d "$base/$part" ] && mv "$base/$part" "$out/"
 done
 # The notices stage.sh copies beside the kernel.
-for f in LICENSE.html NOTICE CREDITS.fodt license.txt LICENSE; do
+for f in LICENSE.html NOTICE CREDITS.fodt license.txt; do
   src=$(find "$base" -maxdepth 2 -name "$f" | head -n 1)
   [ -n "$src" ] && cp "$src" "$out/"
+done
+# licenses.sh hard-requires these; fail here, not in a later job.
+for f in LICENSE.html NOTICE CREDITS.fodt license.txt; do
+  [ -s "$out/$f" ] || {
+    echo "extract-official-lo-win-arm64: no $f found under $base" >&2
+    exit 1
+  }
 done
 [ -d "$out/program" ] || {
   echo "extract-official-lo-win-arm64: extraction missed program/" >&2
