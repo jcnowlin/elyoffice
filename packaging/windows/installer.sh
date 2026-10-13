@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Builds dist/<Name>-<version>-windows-x86_64-setup.exe. Usage: installer.sh <slug>
 set -euo pipefail
+# Never die silently again: report the exact line and command on failure.
+trap 'rc=$?; echo "${BASH_SOURCE[0]}:$LINENO: `$BASH_COMMAND` exited $rc" >&2' ERR
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
 slug=${1:?app slug, such as ely-doc}

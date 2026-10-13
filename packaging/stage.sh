@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Stages an app with its engines. Usage: stage.sh <slug> <dir>
 set -euo pipefail
+# Never die silently again: report the exact line and command on failure.
+trap 'rc=$?; echo "${BASH_SOURCE[0]}:$LINENO: `$BASH_COMMAND` exited $rc" >&2' ERR
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 slug=${1:?app slug, such as ely-doc}
@@ -56,27 +58,19 @@ if uses ely-lok; then
       aarch64) vcarch=arm64 ;;
       *) vcarch=x64 ;;
     esac
-    crt=""
-    for vsver in 2022 18 19 20; do
-      cand=$(ls -d "/c/Program Files/Microsoft Visual Studio/$vsver/"*/VC/Redist/MSVC/*/"$vcarch"/Microsoft.VC14*.CRT 2>/dev/null | tail -n 1)
-      if [ -n "$cand" ]; then
-        crt=$cand
-        break
-      fi
-    done
-    # Fallback: vswhere (handles any VS version)
-    if [ -z "$crt" ] && command -v vswhere.exe >/dev/null 2>&1; then
-      vspath=$(vswhere.exe -latest -property installationPath 2>/dev/null | tr -d '\r')
-      if [ -n "$vspath" ]; then
-        # Convert Windows path to MSYS path
-        vsunix=$(cygpath -u "$vspath" 2>/dev/null || echo "")
-        if [ -n "$vsunix" ]; then
-          cand=$(ls -d "$vsunix"/VC/Redist/MSVC/*/"$vcarch"/Microsoft.VC14*.CRT 2>/dev/null | tail -n 1)
-          [ -n "$cand" ] && crt=$cand
-        fi
-      fi
+    # NOTE: every ls is guarded with || true — under set -euo pipefail,
+    # a failed ls inside $(...) would otherwise kill the script with a
+    # silent exit 2 (stderr already /dev/null'd). That was the silent killer
+    # on runners without a VS 2022 dir (run 38345596332).
+    vs="/c/Program Files/Microsoft Visual Studio"
+    crt=$( { ls -d "$vs"/*/*/VC/Redist/MSVC/*/"$vcarch"/Microsoft.VC14*.CRT 2>/dev/null || true; } | sort -V | tail -n 1)
+    # Fallback: vswhere by absolute path (not on Git Bash's PATH)
+    vswhere="/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+    if [ -z "$crt" ] && [ -x "$vswhere" ]; then
+      vsunix=$(cygpath -u "$( "$vswhere" -latest -property installationPath | tr -d '\r')")
+      crt=$( { ls -d "$vsunix"/VC/Redist/MSVC/*/"$vcarch"/Microsoft.VC14*.CRT 2>/dev/null || true; } | sort -V | tail -n 1)
     fi
-    need "$crt" "the Visual Studio C++ tools ($vcarch) - checked 2022/18/19/20 and vswhere"
+    need "$crt" "the Visual Studio C++ tools ($vcarch)"
     cp "$crt"/*.dll "$out/libreoffice/program/"
   fi
 fi

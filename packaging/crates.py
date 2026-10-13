@@ -13,7 +13,9 @@ standard = root / "packaging" / "licenses"
 # text=True would use the system codepage (cp1252 on Windows) and crash
 # on bytes like 0x81 that cp1252 doesn't define.
 def run_utf8(*args):
-    return subprocess.run(args, check=True, capture_output=True).stdout.decode("utf-8")
+    # stdout=PIPE (not capture_output): if the command fails, its stderr
+    # still reaches the log instead of being swallowed.
+    return subprocess.run(args, check=True, stdout=subprocess.PIPE).stdout.decode("utf-8")
 
 host = next(line.split()[1] for line in run_utf8("rustc", "-vV").splitlines() if line.startswith("host:"))
 meta = json.loads(run_utf8(
