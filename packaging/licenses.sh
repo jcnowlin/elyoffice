@@ -39,10 +39,11 @@ case $slug in
   ely-pdf)
     put MuPDF "$root/engines/mupdf-src/COPYING"
     # Every third party the MuPDF build compiled in.
+    # (build-mupdf.sh saves these lists; the vcxproj files aren't cached.)
     case $(uname) in
       MINGW* | MSYS*)
-        parts=$(python3 "$root/packaging/windows/mupdf-parts.py" "$root/engines/mupdf-src" parts)
-        families=$(python3 "$root/packaging/windows/mupdf-parts.py" "$root/engines/mupdf-src" fonts)
+        parts=$(cat "$root/engines/mupdf-build/parts.txt")
+        families=$(cat "$root/engines/mupdf-build/fonts.txt")
         ;;
       Darwin)
         parts=$(ls "$root/engines/mupdf-build/thirdparty")

@@ -58,6 +58,10 @@ PROPS
       ARM64) cp "$src"/platform/win32/ARM64/Release/*.lib "$out/" ;;
       *) cp "$src"/platform/win32/x64/Release/*.lib "$out/" ;;
     esac
+    # licenses.sh needs the thirdparty/font lists but must not require the
+    # vcxproj files (they're not in the engine cache). Save them here.
+    python3 "$root/packaging/windows/mupdf-parts.py" "$src" parts >"$out/parts.txt"
+    python3 "$root/packaging/windows/mupdf-parts.py" "$src" fonts >"$out/fonts.txt"
     ls "$out"
     exit 0
     ;;
