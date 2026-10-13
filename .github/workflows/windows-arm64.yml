@@ -36,6 +36,9 @@ jobs:
           - engine: mupdf
             path: |
               engines/mupdf-build
+              engines/mupdf-src/COPYING
+              engines/mupdf-src/thirdparty
+              engines/mupdf-src/resources/fonts
               engines/vcpkg/installed/arm64-windows-static
               reference/mupdf/include
             key: ely-mupdf-win-arm64-8ad45e92
@@ -104,6 +107,9 @@ jobs:
         with:
           path: |
             engines/mupdf-build
+            engines/mupdf-src/COPYING
+            engines/mupdf-src/thirdparty
+            engines/mupdf-src/resources/fonts
             engines/vcpkg/installed/arm64-windows-static
             reference/mupdf/include
           key: ely-mupdf-win-arm64-8ad45e92-${{ hashFiles('scripts/build-mupdf.sh', 'patches/mupdf/**') }}

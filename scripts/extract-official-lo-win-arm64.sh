@@ -75,7 +75,7 @@ for part in program share presets; do
   [ -d "$base/$part" ] && mv "$base/$part" "$out/"
 done
 # The notices stage.sh copies beside the kernel.
-for f in LICENSE.html NOTICE CREDITS.fodt; do
+for f in LICENSE.html NOTICE CREDITS.fodt license.txt LICENSE; do
   src=$(find "$base" -maxdepth 2 -name "$f" | head -n 1)
   [ -n "$src" ] && cp "$src" "$out/"
 done

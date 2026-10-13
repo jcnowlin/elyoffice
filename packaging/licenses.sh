@@ -73,7 +73,13 @@ case $slug in
       put "MuPDF/fonts/$name" $found
     done
     case $(uname) in
-      MINGW* | MSYS*) put OpenSSL "$root/engines/vcpkg/installed/x64-windows-static/share/openssl/copyright" ;;
+      MINGW* | MSYS*)
+        case ${ELY_ARCH:-x86_64} in
+          aarch64) triplet=arm64-windows-static ;;
+          *) triplet=x64-windows-static ;;
+        esac
+        put OpenSSL "$root/engines/vcpkg/installed/$triplet/share/openssl/copyright"
+        ;;
       Darwin) put OpenSSL "$(pkg-config --variable=prefix libcrypto)/LICENSE.txt" ;;
       *) put OpenSSL /usr/share/doc/libssl-dev/copyright /usr/share/common-licenses/Apache-2.0 ;;
     esac
@@ -86,10 +92,12 @@ case $slug in
     ;;
 esac
 # ElyTree carries Git; on Windows and Linux ElyMark does too.
+# MinGit (Windows) ships no git-lfs docs; only require its licence when present.
 if [ "$slug" = ely-tree ] || { [ "$slug" = ely-mark ] && [ "$(uname)" != Darwin ]; }; then
   case $(uname) in
     MINGW* | MSYS*) put Git "$root/engines/git/LICENSE.txt" ;;
     *) put Git "$root/engines/git-src/COPYING" "$root/engines/git-src/LGPL-2.1" ;;
   esac
-  put git-lfs "$root/engines/git/share/doc/git-lfs/LICENSE.md"
+  lfs_lic="$root/engines/git/share/doc/git-lfs/LICENSE.md"
+  [ -s "$lfs_lic" ] && put git-lfs "$lfs_lic"
 fi
