@@ -38,7 +38,7 @@ jobs:
               engines/mupdf-build
               engines/vcpkg/installed/arm64-windows-static
               reference/mupdf/include
-            key: ely-mupdf-win-arm64-8ad45e92-${{ hashFiles('scripts/build-mupdf.sh', 'patches/mupdf/**') }}
+            key: ely-mupdf-win-arm64-8ad45e92
           - engine: git
             path: engines/git
             key: ely-mingit-arm64-2.56.0
@@ -52,7 +52,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ matrix.path }}
-          key: ${{ matrix.key }}
+          # hashFiles isn't allowed in the matrix definition, so the mupdf
+          # key gets its script hash here (must match the build job's key).
+          key: ${{ matrix.engine == 'mupdf' && format('{0}-{1}', matrix.key, hashFiles('scripts/build-mupdf.sh', 'patches/mupdf/**')) || matrix.key }}
       - name: Build ${{ matrix.engine }}
         if: steps.cache.outputs.cache-hit != 'true'
         shell: bash
