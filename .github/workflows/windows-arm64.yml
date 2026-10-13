@@ -1,8 +1,9 @@
 # Windows ARM64 (aarch64-pc-windows-msvc) build, pieced up so no single
 # runner sits on the whole pipeline: engines build in parallel matrix legs
 # with per-engine caches, then each app builds+packages in its own job.
-# Manual trigger only until the first green run; ely-mark stays opt-in
-# until CEF's ARM64 story is proven.
+# Manual trigger only until the first green run. CEF ARM64 story: the
+# windowsarm64 minimal build is fetched via cef-rs's export-cef-dir and
+# cached as the cef engine, so ely-mark now runs like the other apps.
 name: windows-arm64
 on:
   workflow_dispatch:
@@ -48,8 +49,24 @@ jobs:
           - engine: tessdata
             path: engines/tessdata
             key: ely-tessdata-2026-10
+          - engine: cef
+            path: |
+              engines/cef
+              reference/cef/LICENSE.txt
+            key: ely-cef-win-arm64
     steps:
       - uses: actions/checkout@v4
+      - name: Compute CEF cache key
+        id: cefkey
+        if: matrix.engine == 'cef'
+        shell: bash
+        run: |
+          # The CEF version comes from the cef-rs pin; fail if the two
+          # pins disagree so the cache can never serve a stale version.
+          a=$(awk '$1=="fetch" && $2=="cef-rs" {print $4}' scripts/fetch-references.sh)
+          b=$(grep -o 'cef-rs", rev = "[0-9a-f]*' Cargo.toml | grep -o '[0-9a-f]*$')
+          [ "$a" = "$b" ] || { echo "cef-rs pin mismatch: refs=$a Cargo.toml=$b" >&2; exit 1; }
+          echo "key=ely-cef-win-arm64-$a-${{ hashFiles('scripts/fetch-cef.sh') }}" >> "$GITHUB_OUTPUT"
       - name: Restore ${{ matrix.engine }} cache
         id: cache
         uses: actions/cache@v4
@@ -57,7 +74,7 @@ jobs:
           path: ${{ matrix.path }}
           # hashFiles isn't allowed in the matrix definition, so script
           # hashes get appended here (must match the build job's keys).
-          key: ${{ matrix.engine == 'mupdf' && format('{0}-{1}', matrix.key, hashFiles('scripts/build-mupdf.sh', 'patches/mupdf/**')) || matrix.engine == 'lo' && format('{0}-{1}', matrix.key, hashFiles('scripts/extract-official-lo-win-arm64.sh')) || matrix.key }}
+          key: ${{ matrix.engine == 'mupdf' && format('{0}-{1}', matrix.key, hashFiles('scripts/build-mupdf.sh', 'patches/mupdf/**')) || matrix.engine == 'lo' && format('{0}-{1}', matrix.key, hashFiles('scripts/extract-official-lo-win-arm64.sh')) || matrix.engine == 'cef' && steps.cefkey.outputs.key || matrix.key }}
       - name: Build ${{ matrix.engine }}
         if: steps.cache.outputs.cache-hit != 'true'
         shell: bash
@@ -82,6 +99,20 @@ jobs:
               ;;
             tessdata)
               ./scripts/fetch-tessdata.sh
+              ;;
+            cef)
+              # Only the two pins we need; the full fetch-references.sh
+              # clones LO/MuPDF/mailcore2 and more we don't want here.
+              for name in cef cef-rs; do
+                read -r url rev < <(awk -v n="$name" '$1=="fetch" && $2==n {print $3, $4}' scripts/fetch-references.sh)
+                rm -rf "reference/$name"
+                git init -q "reference/$name"
+                git -C "reference/$name" fetch -q --depth 1 "$url" "$rev"
+                git -C "reference/$name" checkout -q FETCH_HEAD
+              done
+              ./scripts/fetch-cef.sh
+              [ -s engines/cef/icudtl.dat ] && [ -s engines/cef/libcef.dll ] && [ -s reference/cef/LICENSE.txt ]
+              file engines/cef/libcef.dll | grep -qi 'aarch64\|arm64' || { echo "CEF is not ARM64" >&2; exit 1; }
               ;;
           esac
 
@@ -126,6 +157,33 @@ jobs:
           path: engines/tessdata
           key: ely-tessdata-2026-10
           fail-on-cache-miss: true
+      - name: Compute CEF cache key
+        id: cefkey
+        if: matrix.app == 'ely-mark'
+        shell: bash
+        run: |
+          a=$(awk '$1=="fetch" && $2=="cef-rs" {print $4}' scripts/fetch-references.sh)
+          b=$(grep -o 'cef-rs", rev = "[0-9a-f]*' Cargo.toml | grep -o '[0-9a-f]*$')
+          [ "$a" = "$b" ] || { echo "cef-rs pin mismatch: refs=$a Cargo.toml=$b" >&2; exit 1; }
+          echo "key=ely-cef-win-arm64-$a-${{ hashFiles('scripts/fetch-cef.sh') }}" >> "$GITHUB_OUTPUT"
+      - name: Restore CEF engine
+        if: matrix.app == 'ely-mark'
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            engines/cef
+            reference/cef/LICENSE.txt
+          key: ${{ steps.cefkey.outputs.key }}
+          fail-on-cache-miss: true
+      - name: Setup Node.js
+        if: matrix.app == 'ely-mark'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build ElyMark web content
+        if: matrix.app == 'ely-mark'
+        shell: bash
+        run: ./scripts/build-mark-content.sh
       - name: Rust toolchain
         shell: bash
         run: |
@@ -140,6 +198,9 @@ jobs:
         env:
           ELY_LO_DIR: ${{ github.workspace }}/engines/lo-win-arm64
           ELY_DIST: ${{ github.workspace }}/dist
+          # Only ely-mark links cef-dll-sys; this keeps build.rs from
+          # downloading its own copy into OUT_DIR on every cold build.
+          CEF_PATH: ${{ github.workspace }}/engines/cef
         run: |
           set -euo pipefail
           ./packaging/windows/installer.sh "${{ matrix.app }}"

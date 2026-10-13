@@ -10,6 +10,9 @@ work=$(mktemp -d "$root/engines/cef-export.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 cd "$root/reference/cef-rs"
 # The exporter checks each archive against CEF's own index.
-CARGO_TARGET_DIR="$work" cargo run -q -p export-cef-dir -- --force "$root/engines/cef"
+# Pass --target explicitly: the default is the host the exporter was built
+# for, and an x64 toolchain under emulation would silently fetch x64 CEF.
+CARGO_TARGET_DIR="$work" cargo run -q -p export-cef-dir -- --force \
+  ${CARGO_BUILD_TARGET:+--target "$CARGO_BUILD_TARGET"} "$root/engines/cef"
 rm -f "$root"/engines/cef_binary_*.tar.bz2
 cat "$root/engines/cef/archive.json"
