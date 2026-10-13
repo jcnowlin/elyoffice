@@ -8,13 +8,17 @@ NAMES = ("licen", "copying", "notice", "copyright", "unlicense")
 
 root = pathlib.Path(__file__).resolve().parent.parent
 standard = root / "packaging" / "licenses"
-host = next(line.split()[1] for line in subprocess.run(
-    ["rustc", "-vV"], check=True, capture_output=True, text=True).stdout.splitlines() if line.startswith("host:"))
 # Only what this machine's build links.
-meta = json.loads(subprocess.run(
-    ["cargo", "metadata", "--format-version", "1", "--locked", "--filter-platform", host,
-     "--manifest-path", str(root / "Cargo.toml")],
-    check=True, capture_output=True, text=True).stdout)
+# NOTE: decode as UTF-8 explicitly — cargo emits UTF-8, but Python's
+# text=True would use the system codepage (cp1252 on Windows) and crash
+# on bytes like 0x81 that cp1252 doesn't define.
+def run_utf8(*args):
+    return subprocess.run(args, check=True, capture_output=True).stdout.decode("utf-8")
+
+host = next(line.split()[1] for line in run_utf8("rustc", "-vV").splitlines() if line.startswith("host:"))
+meta = json.loads(run_utf8(
+    "cargo", "metadata", "--format-version", "1", "--locked", "--filter-platform", host,
+    "--manifest-path", str(root / "Cargo.toml")))
 by_id = {package["id"]: package for package in meta["packages"]}
 own = set(meta["workspace_members"])
 nodes = {node["id"]: node for node in meta["resolve"]["nodes"]}

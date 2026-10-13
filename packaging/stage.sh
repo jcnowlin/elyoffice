@@ -58,7 +58,7 @@ if uses ely-lok; then
     esac
     crt=""
     for vsver in 2022 18 19 20; do
-      cand=$(ls -d "/c/Program Files/Microsoft Visual Studio/$vsver/"*/VC/Redist/MSVC/*/"$vcarch"/Microsoft.VC143.CRT 2>/dev/null | tail -n 1)
+      cand=$(ls -d "/c/Program Files/Microsoft Visual Studio/$vsver/"*/VC/Redist/MSVC/*/"$vcarch"/Microsoft.VC14*.CRT 2>/dev/null | tail -n 1)
       if [ -n "$cand" ]; then
         crt=$cand
         break
@@ -71,7 +71,7 @@ if uses ely-lok; then
         # Convert Windows path to MSYS path
         vsunix=$(cygpath -u "$vspath" 2>/dev/null || echo "")
         if [ -n "$vsunix" ]; then
-          cand=$(ls -d "$vsunix"/VC/Redist/MSVC/*/"$vcarch"/Microsoft.VC143.CRT 2>/dev/null | tail -n 1)
+          cand=$(ls -d "$vsunix"/VC/Redist/MSVC/*/"$vcarch"/Microsoft.VC14*.CRT 2>/dev/null | tail -n 1)
           [ -n "$cand" ] && crt=$cand
         fi
       fi

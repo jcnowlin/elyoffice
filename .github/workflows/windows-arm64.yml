@@ -51,7 +51,6 @@ jobs:
           key: ${{ matrix.key }}
       - name: Build ${{ matrix.engine }}
         if: steps.cache.outputs.cache-hit != 'true'
-        continue-on-error: true
         shell: bash
         env:
           ELY_LO_VERSION: ${{ inputs.lo_version }}
@@ -129,8 +128,6 @@ jobs:
           ELY_DIST: ${{ github.workspace }}/dist
         run: |
           set -euo pipefail
-          stage=$(mktemp -d)
-          ./packaging/stage.sh "${{ matrix.app }}" "$stage"
           ./packaging/windows/installer.sh "${{ matrix.app }}"
           ls dist/
       - name: Upload installer

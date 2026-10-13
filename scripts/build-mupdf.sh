@@ -51,7 +51,7 @@ case $(uname -s) in
 PROPS
     msbuild=$("/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe" -latest -find 'MSBuild\**\Bin\MSBuild.exe' | tr -d '\r')
     "$msbuild" "$(cygpath -w "$src/platform/win32/mupdf.sln")" -m -nologo -v:minimal \
-      -t:libmupdf -p:Configuration=Release -p:Platform="$platform" -p:PlatformToolset=v143 \
+      -t:libmupdf -p:Configuration=Release -p:Platform="$platform" -p:PlatformToolset=v145 \
       -p:ForceImportAfterCppTargets="$(cygpath -w "$src/ely.props")"
     rm -rf "$out" && mkdir -p "$out"
     case $platform in
