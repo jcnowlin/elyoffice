@@ -51,6 +51,7 @@ jobs:
           key: ${{ matrix.key }}
       - name: Build ${{ matrix.engine }}
         if: steps.cache.outputs.cache-hit != 'true'
+        continue-on-error: true
         shell: bash
         env:
           ELY_LO_VERSION: ${{ inputs.lo_version }}
@@ -79,6 +80,7 @@ jobs:
   build:
     name: ${{ matrix.app }}
     needs: engines
+    if: always()
     runs-on: windows-11-arm
     timeout-minutes: 180
     strategy:
