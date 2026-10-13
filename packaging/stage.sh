@@ -51,12 +51,32 @@ if uses ely-lok; then
   if [ -n "$exe" ]; then
     # The kernel needs the VC++ runtime; it ships beside it.
     # ELY_ARCH: x86_64 (default) or aarch64 — selects the CRT folder.
+    # VS version-agnostic: check 2022, 18 (2026), and future versions.
     case ${ELY_ARCH:-x86_64} in
       aarch64) vcarch=arm64 ;;
       *) vcarch=x64 ;;
     esac
-    crt=$(ls -d "/c/Program Files/Microsoft Visual Studio/2022/"*/VC/Redist/MSVC/*/"$vcarch"/Microsoft.VC143.CRT | tail -n 1)
-    need "$crt" "the Visual Studio 2022 C++ tools ($vcarch)"
+    crt=""
+    for vsver in 2022 18 19 20; do
+      cand=$(ls -d "/c/Program Files/Microsoft Visual Studio/$vsver/"*/VC/Redist/MSVC/*/"$vcarch"/Microsoft.VC143.CRT 2>/dev/null | tail -n 1)
+      if [ -n "$cand" ]; then
+        crt=$cand
+        break
+      fi
+    done
+    # Fallback: vswhere (handles any VS version)
+    if [ -z "$crt" ] && command -v vswhere.exe >/dev/null 2>&1; then
+      vspath=$(vswhere.exe -latest -property installationPath 2>/dev/null | tr -d '\r')
+      if [ -n "$vspath" ]; then
+        # Convert Windows path to MSYS path
+        vsunix=$(cygpath -u "$vspath" 2>/dev/null || echo "")
+        if [ -n "$vsunix" ]; then
+          cand=$(ls -d "$vsunix"/VC/Redist/MSVC/*/"$vcarch"/Microsoft.VC143.CRT 2>/dev/null | tail -n 1)
+          [ -n "$cand" ] && crt=$cand
+        fi
+      fi
+    fi
+    need "$crt" "the Visual Studio C++ tools ($vcarch) - checked 2022/18/19/20 and vswhere"
     cp "$crt"/*.dll "$out/libreoffice/program/"
   fi
 fi
